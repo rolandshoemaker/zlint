@@ -70,9 +70,10 @@ func MakeIssuerString(cert *x509.Certificate, result *lints.ZLintResult, validat
 	numWarnings := len(result.Warnings)
 	notBefore := cert.NotBefore.String()
 	notAfter := cert.NotAfter.String()
+	sha256fp := string(cert.FingerprintSHA256[:])
 
 	var outputString string
-	outputString += strconv.Itoa(numErrors) + "," + strconv.Itoa(numWarnings) + "," + strconv.FormatBool(validation.nssValid) + "," + strconv.FormatBool(validation.nssWasValid) + "," + notBefore + "," + notAfter + "," + issuerDn + "," + subjectDn + "," + strings.Join(result.Errors, ",") + "," + strings.Join(result.Warnings, ",") + "\n"
+	outputString += strconv.Itoa(numErrors) + "," + strconv.Itoa(numWarnings) + "," + sha256fp + "," + strconv.FormatBool(validation.nssValid) + "," + strconv.FormatBool(validation.nssWasValid) + "," + notBefore + "," + notAfter + "," + issuerDn + "," + subjectDn + "," + strings.Join(result.Errors, ",") + "," + strings.Join(result.Warnings, ",") + "\n"
 	return outputString
 }
 
