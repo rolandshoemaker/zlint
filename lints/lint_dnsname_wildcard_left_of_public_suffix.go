@@ -1,7 +1,6 @@
 package lints
 
 import (
-	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"github.com/zmap/zcrypto/x509"
 	"github.com/zmap/zlint/util"
 )
@@ -17,7 +16,7 @@ func (l *DNSNameWildcardLeftofPublicSuffix) CheckApplies(c *x509.Certificate) bo
 }
 
 func wildcardLeftOfPublicSuffix(domain string) (bool, error) {
-	parsedDomain, err := publicsuffix.Parse(domain)
+	parsedDomain, err := util.ICANNPublicSuffixParse(domain)
 	if err != nil {
 		return true, err
 	}

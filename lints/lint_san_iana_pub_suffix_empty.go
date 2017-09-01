@@ -5,7 +5,6 @@ package lints
 import (
 	"github.com/zmap/zcrypto/x509"
 	"github.com/zmap/zlint/util"
-	"golang.org/x/net/publicsuffix"
 )
 
 type pubSuffix struct{}
@@ -20,7 +19,11 @@ func (l *pubSuffix) CheckApplies(c *x509.Certificate) bool {
 
 func (l *pubSuffix) Execute(c *x509.Certificate) *LintResult {
 	for _, dns := range c.DNSNames {
-		suffix, _ := publicsuffix.PublicSuffix(dns)
+		parsedDomain, err := util.ICANNPublicSuffixParse(dns)
+		if err != nil {
+			return &LintResult{Status: Fatal}
+		}
+		suffix := parsedDomain.TLD
 		if suffix == dns {
 			return &LintResult{Status: Warn}
 		}

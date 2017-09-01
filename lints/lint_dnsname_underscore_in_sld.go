@@ -3,7 +3,6 @@ package lints
 import (
 	"strings"
 
-	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"github.com/zmap/zcrypto/x509"
 	"github.com/zmap/zlint/util"
 )
@@ -19,7 +18,7 @@ func (l *DNSNameUnderscoreInSLD) CheckApplies(c *x509.Certificate) bool {
 }
 
 func underscoreInSLD(domain string) (bool, error) {
-	domainName, err := publicsuffix.Parse(domain)
+	domainName, err := util.ICANNPublicSuffixParse(domain)
 	if err != nil {
 		return true, err
 	}
