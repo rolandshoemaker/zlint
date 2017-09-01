@@ -1,114 +1,199 @@
 package main
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"flag"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/zmap/zcrypto/x509"
+	"io"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
 	"github.com/zmap/zlint"
 )
 
 var ( //flags
-	listLintsJSON bool
-	prettyprint   bool
-	format        string
+	inPath           string
+	outPath          string
+	numCertThreads   int
+	prettyPrint      bool
+	numProcs         int
+	channelSize      int
+	crashIfParseFail bool
+	outProcessPath   string
 )
 
+var fileMutex sync.Mutex
+
 func init() {
-	flag.BoolVar(&listLintsJSON, "list-lints-json", false, "Use this flag to print supported lints in JSON format, one per line")
-	flag.StringVar(&format, "format", "pem", "One of {pem, der, base64}")
-	flag.BoolVar(&prettyprint, "pretty", false, "Pretty-print output")
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [flags] file...\n", os.Args[0])
-		flag.PrintDefaults()
-	}
+	flag.StringVar(&inPath, "input-file", "", "File path for the input certificate(s).")
+	flag.StringVar(&outPath, "output-file", "-", "File path for the output JSON.")
+	flag.StringVar(&outProcessPath, "output-process", "-", "File path for output error preprocess.")
+	flag.BoolVar(&prettyPrint, "list-lints-json", false, "Use this flag to print supported lints in JSON format, one per line")
+	flag.IntVar(&numCertThreads, "cert-threads", 1, "Use this flag to specify the number of threads in -threads mode.  This has no effect otherwise.")
+	flag.IntVar(&numProcs, "procs", 0, "Use this flag to specify the number of processes to run on.")
+	flag.IntVar(&channelSize, "channel-size", 1000000, "Use this flag to specify the number of values in the buffered channel.")
+	flag.BoolVar(&crashIfParseFail, "fatal-parse-errors", false, "Fatally crash if a certificate cannot be parsed. Log by default.")
 	flag.Parse()
-	log.SetLevel(log.InfoLevel)
+}
+
+func CustomMarshal(validation interface{}, lintResult *zlint.ResultSet, raw []byte, parsed *x509.Certificate) ([]byte, error) {
+	return json.Marshal(struct {
+		Raw        []byte             `json:"raw,omitempty"`
+		Parsed     *x509.Certificate  `json:"parsed,omitempty"`
+		ZLint      *zlint.ResultSet   `json:"zlint,omitempty"`
+		Validation interface{}        `json:"validation,omitempty"`
+	}{
+		Raw:        raw,
+		Parsed:     parsed,
+		ZLint:      lintResult,
+		Validation: validation,
+	})
+}
+
+type Validation struct {
+	nssValid    bool
+	nssWasValid bool
+}
+
+func MakeIssuerString(cert *x509.Certificate, result *zlint.ResultSet, validationInterface interface{}) string {
+	validation := FillOutValidationStruct(validationInterface)
+	issuerDn := cert.Issuer.String()
+	issuerDn = strings.Replace(issuerDn, ", ", ":", -1)
+	subjectDn := cert.Subject.String()
+	subjectDn = strings.Replace(subjectDn, ", ", ":", -1)
+	numErrors := len(result.Errors)
+	numWarnings := len(result.Warnings)
+	notBefore := cert.NotBefore.String()
+	notAfter := cert.NotAfter.String()
+	sha256fp := cert.FingerprintSHA256.Hex()
+
+	var outputString string
+	outputString += strconv.Itoa(numErrors) + "," + strconv.Itoa(numWarnings) + "," + strconv.FormatBool(validation.nssValid) + "," + strconv.FormatBool(validation.nssWasValid) + "," + notBefore + "," + notAfter + "," + issuerDn + "," + subjectDn + "," + sha256fp + "," + strings.Join(result.Errors, ",") + "," + strings.Join(result.Warnings, ",") + "\n"
+	return outputString
+}
+
+func FillOutValidationStruct(validation interface{}) *Validation {
+	v := Validation{}
+	validationMap := validation.(map[string]interface{})
+	nssMap := validationMap["nss"].(map[string]interface{})
+
+	v.nssValid = nssMap["valid"].(bool)
+	v.nssWasValid = nssMap["was_valid"].(bool)
+
+	return &v
+}
+
+func ProcessCertificate(in <-chan interface{}, out chan<- []byte, outFile *os.File, outProcessFile *os.File, wg *sync.WaitGroup) {
+	log.Info("Processing certificates...")
+	defer wg.Done()
+	for raw := range in {
+		zdbData := raw.(map[string]interface{})
+		raw := zdbData["raw"]
+		validation := zdbData["validation"]
+		der, err := base64.StdEncoding.DecodeString(raw.(string))
+		parsed, err := x509.ParseCertificate(der)
+		if err != nil { //could not parse
+			if crashIfParseFail {
+				log.Fatal("could not parse certificate with error: ", err)
+			} else {
+				log.Info("could not parse certificate with error: ", err)
+			}
+		} else { //parsed
+			zlintResult := zlint.LintCertificate(parsed)
+			var processedString string
+			if validation != nil {
+				processedString = MakeIssuerString(parsed, zlintResult, validation)
+			} else {
+				processedString = "\n"
+			}
+			jsonResult, err := CustomMarshal(validation, zlintResult, der, parsed)
+			if err != nil {
+				log.Fatal("could not parse JSON.")
+			}
+			fileMutex.Lock()
+			outProcessFile.WriteString(processedString)
+			outFile.Write(jsonResult)
+			outFile.Write([]byte{'\n'})
+			fileMutex.Unlock()
+		}
+	} //
+}
+
+func ReadCertificate(out chan<- interface{}, filename string, wg *sync.WaitGroup) {
+	log.Info("Reading certificates...")
+	defer wg.Done()
+	if file, err := os.Open(filename); err == nil {
+		defer file.Close()
+		d := json.NewDecoder(file)
+		for {
+			var f interface{}
+			if err := d.Decode(&f); err == io.EOF {
+				break
+			} else if err != nil {
+				// handle error
+			}
+			out <- f
+		}
+	} else {
+		log.Fatal("Error reading file: ", err)
+	}
+}
+
+func WriteOutput(in <-chan []byte, outputFileName string, wg *sync.WaitGroup) {
+	defer wg.Done()
+}
+
+func WriteProcessedFile(in <-chan string, outputFileName string, wg *sync.WaitGroup) {
+	defer wg.Done()
 }
 
 func main() {
+	log.SetLevel(log.InfoLevel)
+	runtime.GOMAXPROCS(numProcs)
 
-	if listLintsJSON {
-		zlint.EncodeLintDescriptionsToJSON(os.Stdout)
-		return
-	}
+	//Initialize Channels
+	certs := make(chan interface{}, channelSize)
+	jsonOut := make(chan []byte, channelSize)
+	processOut := make(chan string, channelSize)
 
-	var inform = strings.ToLower(format)
-	if flag.NArg() < 1 || flag.Arg(0) == "-" {
-		lint(os.Stdin, inform)
-	} else {
-		for _, filePath := range flag.Args() {
-			var inputFile *os.File
-			var err error
-			inputFile, err = os.Open(filePath)
-			if err != nil {
-				log.Fatalf("unable to open file %s: %s", filePath, err)
-			}
-			var fmt = inform
-			switch {
-			case strings.HasSuffix(filePath, ".der"):
-				fmt = "der"
-			case strings.HasSuffix(filePath, ".pem"):
-				fmt = "pem"
-			}
-			lint(inputFile, fmt)
-			inputFile.Close()
-		}
-	}
-}
+	var readerWG sync.WaitGroup
+	var procWG sync.WaitGroup
+	var writerWG sync.WaitGroup
+	var processWg sync.WaitGroup
 
-func lint(inputFile *os.File, inform string) {
-	fileBytes, err := ioutil.ReadAll(inputFile)
+	readerWG.Add(1)
+	writerWG.Add(1)
+	processWg.Add(1)
+
+	processFile, err := os.Create(outProcessPath)
 	if err != nil {
-		log.Fatalf("unable to read file %s: %s", inputFile.Name(), err)
+		log.Fatal("could not create process file")
 	}
 
-	var asn1Data []byte
-	switch inform {
-	case "pem":
-		p, _ := pem.Decode(fileBytes)
-		if p == nil || p.Type != "CERTIFICATE" {
-			log.Fatal("unable to parse PEM")
-		}
-		asn1Data = p.Bytes
-	case "der":
-		asn1Data = fileBytes
-	case "base64":
-		asn1Data, err = base64.StdEncoding.DecodeString(string(fileBytes))
-		if err != nil {
-			log.Fatalf("unable to parse base64: %s", err)
-		}
-	default:
-		log.Fatalf("unknown input format %s", format)
-	}
-
-	c, err := x509.ParseCertificate(asn1Data)
+	outFile, err := os.Create(outPath)
 	if err != nil {
-		log.Fatalf("unable to parse certificate: %s", err)
+		log.Fatal("could not create output file")
 	}
 
-	zlintResult := zlint.LintCertificate(c)
-	jsonBytes, err := json.Marshal(zlintResult.Results)
-	if err != nil {
-		log.Fatalf("unable to encode lints JSON: %s", err)
+	go ReadCertificate(certs, inPath, &readerWG)
+	go WriteOutput(jsonOut, outPath, &writerWG)
+	go WriteProcessedFile(processOut, outProcessPath, &processWg)
+
+	for i := 0; i < numCertThreads; i++ {
+		procWG.Add(1)
+		go ProcessCertificate(certs, jsonOut, outFile, processFile, &procWG)
 	}
-	if prettyprint {
-		var out bytes.Buffer
-		if err := json.Indent(&out, jsonBytes, "", " "); err != nil {
-			log.Fatalf("can't format output: %s", err)
-		}
-		os.Stdout.Write(out.Bytes())
-	} else {
-		os.Stdout.Write(jsonBytes)
-	}
-	os.Stdout.Write([]byte{'\n'})
-	os.Stdout.Sync()
+
+	go func() {
+		readerWG.Wait()
+		close(certs)
+	}()
+
+	procWG.Wait()
+	close(jsonOut)
+	writerWG.Wait()
 }

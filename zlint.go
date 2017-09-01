@@ -24,6 +24,8 @@ type ResultSet struct {
 	WarningsPresent bool                         `json:"warnings_present"`
 	ErrorsPresent   bool                         `json:"errors_present"`
 	FatalsPresent   bool                         `json:"fatals_present"`
+	Errors          []string		     `json:"errors"`
+	Warnings        []string                     `json:"warnings"`
 }
 
 func (z *ResultSet) execute(cert *x509.Certificate) {
@@ -31,18 +33,20 @@ func (z *ResultSet) execute(cert *x509.Certificate) {
 	for name, l := range lints.Lints {
 		res := l.Execute(cert)
 		z.Results[name] = res
-		z.updateErrorStatePresent(res)
+		z.updateErrorStatePresent(res, l)
 	}
 }
 
-func (z *ResultSet) updateErrorStatePresent(result *lints.LintResult) {
+func (z *ResultSet) updateErrorStatePresent(result *lints.LintResult, l *lints.Lint) {
 	switch result.Status {
 	case lints.Notice:
 		z.NoticesPresent = true
 	case lints.Warn:
 		z.WarningsPresent = true
+		z.Warnings = append(z.Warnings, l.Name)
 	case lints.Error:
 		z.ErrorsPresent = true
+		z.Errors = append(z.Errors, l.Name)
 	case lints.Fatal:
 		z.FatalsPresent = true
 	}
