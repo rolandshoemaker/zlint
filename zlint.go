@@ -26,6 +26,7 @@ type ResultSet struct {
 	FatalsPresent   bool                         `json:"fatals_present"`
 	Errors          []string                     `json:"errors"`
 	Warnings        []string                     `json:"warnings"`
+	Fatals          []string                     `json:"fatals"`
 }
 
 func (z *ResultSet) execute(cert *x509.Certificate) {
@@ -49,6 +50,7 @@ func (z *ResultSet) updateErrorStatePresent(result *lints.LintResult, l *lints.L
 		z.Errors = append(z.Errors, l.Name)
 	case lints.Fatal:
 		z.FatalsPresent = true
+		z.Fatals = append(z.Fatals, l.Name)
 	}
 }
 
