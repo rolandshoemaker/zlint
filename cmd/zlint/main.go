@@ -6,13 +6,13 @@ import (
 	"flag"
 	log "github.com/Sirupsen/logrus"
 	"github.com/zmap/zcrypto/x509"
+	"github.com/zmap/zlint"
 	"io"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"github.com/zmap/zlint"
 )
 
 var ( //flags
@@ -42,10 +42,10 @@ func init() {
 
 func CustomMarshal(validation interface{}, lintResult *zlint.ResultSet, raw []byte, parsed *x509.Certificate) ([]byte, error) {
 	return json.Marshal(struct {
-		Raw        []byte             `json:"raw,omitempty"`
-		Parsed     *x509.Certificate  `json:"parsed,omitempty"`
-		ZLint      *zlint.ResultSet   `json:"zlint,omitempty"`
-		Validation interface{}        `json:"validation,omitempty"`
+		Raw        []byte            `json:"raw,omitempty"`
+		Parsed     *x509.Certificate `json:"parsed,omitempty"`
+		ZLint      *zlint.ResultSet  `json:"zlint,omitempty"`
+		Validation interface{}       `json:"validation,omitempty"`
 	}{
 		Raw:        raw,
 		Parsed:     parsed,

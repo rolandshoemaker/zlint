@@ -24,7 +24,7 @@ type ResultSet struct {
 	WarningsPresent bool                         `json:"warnings_present"`
 	ErrorsPresent   bool                         `json:"errors_present"`
 	FatalsPresent   bool                         `json:"fatals_present"`
-	Errors          []string		     `json:"errors"`
+	Errors          []string                     `json:"errors"`
 	Warnings        []string                     `json:"warnings"`
 }
 
