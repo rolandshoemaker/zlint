@@ -1,8 +1,9 @@
 package util
 
 import (
-	"github.com/weppos/publicsuffix-go/publicsuffix"
+	"fmt"
 	"github.com/asaskevich/govalidator"
+	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"github.com/zmap/zcrypto/x509"
 	"net"
 	"strings"
@@ -73,5 +74,6 @@ func DNSNamesExist(cert *x509.Certificate) bool {
 }
 
 func ICANNPublicSuffixParse(domain string) (*publicsuffix.DomainName, error) {
+	fmt.Println(publicsuffix.Parse(domain))
 	return publicsuffix.ParseFromListWithOptions(publicsuffix.DefaultList, domain, &publicsuffix.FindOptions{IgnorePrivate: true})
 }
