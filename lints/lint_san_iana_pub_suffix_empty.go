@@ -15,7 +15,7 @@ func (l *pubSuffix) Initialize() error {
 }
 
 func (l *pubSuffix) CheckApplies(c *x509.Certificate) bool {
-	return util.IsExtInCert(c, util.SubjectAlternateNameOID)
+	return util.IsExtInCert(c, util.SubjectAlternateNameOID) && util.DNSNamesExist(c)
 }
 
 func (l *pubSuffix) Execute(c *x509.Certificate) *LintResult {
@@ -24,6 +24,8 @@ func (l *pubSuffix) Execute(c *x509.Certificate) *LintResult {
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "is a suffix") {
 				return &LintResult{Status: Warn}
+			} else {
+				return &LintResult{Status: Fatal}
 			}
 		}
 	}
