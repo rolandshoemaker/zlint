@@ -6,6 +6,7 @@ import (
 	"github.com/zmap/zcrypto/x509"
 	"github.com/zmap/zlint/util"
 	"strings"
+	"fmt"
 )
 
 type pubSuffix struct{}
@@ -20,6 +21,7 @@ func (l *pubSuffix) CheckApplies(c *x509.Certificate) bool {
 
 func (l *pubSuffix) Execute(c *x509.Certificate) *LintResult {
 	for _, dns := range c.DNSNames {
+		fmt.Println(dns)
 		_, err := util.ICANNPublicSuffixParse(dns)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "is a suffix") {

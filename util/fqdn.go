@@ -74,6 +74,5 @@ func DNSNamesExist(cert *x509.Certificate) bool {
 }
 
 func ICANNPublicSuffixParse(domain string) (*publicsuffix.DomainName, error) {
-	fmt.Println(publicsuffix.Parse(domain))
 	return publicsuffix.ParseFromListWithOptions(publicsuffix.DefaultList, domain, &publicsuffix.FindOptions{IgnorePrivate: true})
 }
