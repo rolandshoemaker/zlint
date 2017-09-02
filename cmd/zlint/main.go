@@ -72,7 +72,7 @@ func MakeIssuerString(cert *x509.Certificate, result *zlint.ResultSet, validatio
 	sha256fp := cert.FingerprintSHA256.Hex()
 
 	var outputString string
-	outputString += strconv.Itoa(numErrors) + "," + strconv.Itoa(numWarnings) + "," + strconv.FormatBool(validation.nssValid) + "," + strconv.FormatBool(validation.nssWasValid) + "," + notBefore + "," + notAfter + "," + issuerDn + "," + subjectDn + "," + sha256fp + "," + strings.Join(result.Errors, ",") + "," + strings.Join(result.Warnings, ",") + "," + strings.Join(result.Fatals, ",") + "\n"
+	outputString += strconv.Itoa(numErrors) + "," + strconv.Itoa(numWarnings) + "," + strconv.FormatBool(validation.nssValid) + "," + strconv.FormatBool(validation.nssWasValid) + "," + notBefore + "," + notAfter + "," + issuerDn + "," + subjectDn + "," + sha256fp + "," + strings.Join(result.Errors, ",") + "," + strings.Join(result.Warnings, ",") + "\n"
 	return outputString
 }
 
