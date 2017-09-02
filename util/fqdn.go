@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"github.com/asaskevich/govalidator"
 	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"github.com/zmap/zcrypto/x509"
