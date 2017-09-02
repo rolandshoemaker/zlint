@@ -19,6 +19,7 @@ var (
 	RFC6818Date                = time.Date(2013, time.January, 1, 0, 0, 0, 0, time.UTC)
 	CABEffectiveDate           = time.Date(2012, time.July, 1, 0, 0, 0, 0, time.UTC)
 	CABSerialNumberEntropyDate = time.Date(2016, time.September, 30, 0, 0, 0, 0, time.UTC)
+	CABGivenNameDate           = time.Date(2016, time.September, 7, 0, 0, 0, 0, time.UTC)
 	CABV102Date                = time.Date(2012, time.June, 8, 0, 0, 0, 0, time.UTC)
 	CABV113Date                = time.Date(2013, time.February, 21, 0, 0, 0, 0, time.UTC)
 	CABV114Date                = time.Date(2013, time.May, 3, 0, 0, 0, 0, time.UTC)
