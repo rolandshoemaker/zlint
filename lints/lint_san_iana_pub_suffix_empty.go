@@ -3,7 +3,6 @@
 package lints
 
 import (
-	"fmt"
 	"github.com/zmap/zcrypto/x509"
 	"github.com/zmap/zlint/util"
 	"strings"
