@@ -85,8 +85,6 @@ func (l *Lint) CheckEffective(c *x509.Certificate) bool {
 func (l *Lint) Execute(cert *x509.Certificate) *LintResult {
 	if !l.Lint.CheckApplies(cert) {
 		return &LintResult{Status: NA}
-	} else if !l.CheckEffective(cert) {
-		return &LintResult{Status: NE}
 	}
 	res := l.Lint.Execute(cert)
 	return res
